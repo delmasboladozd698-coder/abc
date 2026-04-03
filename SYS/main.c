@@ -15,6 +15,7 @@ int main(void)
     KEY_Init();			//按键初始化
     LED_GPIO_Config();	//LED初始化
     oled_Init();		//oled初始化
+	  RELAY_GPIO_Config();
     TIM2_Init(499, 7199); //定时器2初始化 定时扫描按键
     Adc_Init();			//ADC初始化
     DHT11_Init();		//DHT11初始化
@@ -30,7 +31,11 @@ int main(void)
         }
 
         SensorData.LightVal = (int)R_to_Lux(Get_Adc_Average(0, 10)); //获取光照强度;
-        SensorData.SoilVal = 99 - (int)Get_Adc_Average(5, 10) / 41; //获取土壤湿度;
+        float adc_val = (float)Get_Adc_Average(5, 10);
+        float soil_hum = 159.222f - 0.09042f * adc_val;
+        if(soil_hum > 100.0f) soil_hum = 100.0f;
+        if(soil_hum < 0.0f) soil_hum = 0.0f;
+        SensorData.SoilVal = soil_hum;//获取土壤湿度;
         Mode_selection();//模式选择（按键1选择模式）
         save_Threshold();//当阈值数据有改变是存入flash函数
     }

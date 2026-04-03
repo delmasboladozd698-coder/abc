@@ -11,10 +11,8 @@ uint8_t thresholdFlag = 0;
 //???????
 uint8_t  manualFlag = 0;
 
-static PID_TypeDef Fan_PID;
 static PID_TypeDef Pump_PID;
 static uint8_t pid_hardware_init_flag = 0; 
-static uint16_t fan_pwm_output = 0;
 static uint16_t pump_pwm_output = 0;
 
 /*****************????????? ??????????????*/
@@ -32,7 +30,6 @@ void Mode_selection(void)
 
         if (mode_selection == 2) { //???????,???????
             System.Switch1 = System.Switch2 = System.Switch3 = 0; // ???? Switch4
-            fan_pwm_output = 0;
             pump_pwm_output = 0;
         }
     }
@@ -77,15 +74,7 @@ void Automatic(void)
     if (++pid_tick >= 50) { 
         pid_tick = 0;
 
-        Fan_PID.target_val = Threshold.TempThreshold;
         Pump_PID.target_val = Threshold.SoilThreshold;
-
-        // --- 1. ??????(??) ---
-        float fan_error = SensorData.TempVal - Fan_PID.target_val;
-        if (fan_error <= 0) fan_error = 0; 
-
-        Fan_PID.target_val = fan_error;    
-        fan_pwm_output = (uint16_t)PID_Compute(&Fan_PID, 0);
 
         // --- 2. ??????(??) ---
         float pump_error = Pump_PID.target_val - SensorData.SoilVal;
@@ -95,8 +84,13 @@ void Automatic(void)
         pump_pwm_output = (uint16_t)PID_Compute(&Pump_PID, 0);
     }
 
-    System.Switch1 = (fan_pwm_output > 0) ? 1 : 0; 
     System.Switch2 = (pump_pwm_output > 0) ? 1 : 0; 
+		
+		    if (SensorData.TempVal >= Threshold.TempThreshold) {//如果温度大于阈值
+        System.Switch1 = 1;//继电器-风扇开关标志位置1
+    } else {
+        System.Switch1 = 0;//继电器-风扇开关标志位置0
+    }
 
     // ??????
     if (SensorData.LightVal <= Threshold.LightThreshold) {
@@ -117,20 +111,21 @@ void Action(void)
     if (pid_hardware_init_flag == 0) {
         Motor_PWM_Init(1000, 71); 
         
-        PID_Init(&Fan_PID, 50.0, 5.0, 1.0, 1000.0, 0.0);
         PID_Init(&Pump_PID, 40.0, 2.0, 0.5, 1000.0, 0.0);
         
         pid_hardware_init_flag = 1;
     }
 
     if (mode_selection == 2) {
-        Set_Fan_Speed(System.Switch1 ? 1000 : 0);
         Set_Pump_Speed(System.Switch2 ? 1000 : 0);
     } else {
-        Set_Fan_Speed(fan_pwm_output);
         Set_Pump_Speed(pump_pwm_output);
     }
-
+    if (System.Switch1 == 1) {//继电器-风扇开关标志位为1
+        RELAY1_ON;//打开继电器-风扇
+    } else {
+        RELAY1_OFF;//关闭继电器-风扇
+    }
     if (System.Switch3 == 1) {
         LED1_ON;//????
     } else {
@@ -170,8 +165,9 @@ void Display(void)
         oled_ShowCHinese(16 * 0, 2 * 2, 20);
         oled_ShowCHinese(16 * 1, 2 * 2, 21);
         oled_ShowString(16 * 3, 2 * 2, ":", 16);
-        oled_ShowNum(16 * 4, 2 * 2, SensorData.SoilVal, 2, 16);//????????
-        oled_ShowString(16 * 5, 2 * 2, "%RH", 16);
+        char soil_str[16]; 
+        sprintf(soil_str, "%5.1f%%", SensorData.SoilVal); 
+        oled_ShowString(16 * 4, 2 * 2, (uint8_t *)soil_str, 16);
         //??
         oled_ShowCHinese(16 * 0, 2 * 3, 17);
         oled_ShowCHinese(16 * 1, 2 * 3, 24);

@@ -64,7 +64,7 @@
 typedef struct
 {
 	uint8_t TempVal;//温度
-    uint8_t SoilVal;//土壤湿度
+    float SoilVal;//土壤湿度
 	uint16_t LightVal;//光照强度
 }SENSOR;
 
